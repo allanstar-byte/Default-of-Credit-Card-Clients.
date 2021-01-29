@@ -1,0 +1,1206 @@
+---
+title:  "Module Three Project "
+author: "ABRACA - DATA"
+date: "1/25/2021"
+output: html_document
+---
+
+# Advertisement
+
+## 1. Defining the question
+
+### a) Specifying the Question
+To estimate the probability of default payment by a credit card client based on the historical data provided using supervised and unsupervised machine learning models.
+
+### b) Defining the Metric for Success
+
+The analysis will be considered a success when interactive visualizations that tell a good story are achieved. An all-round Exploratory data analysis is achieved and a powerful supervised and unsupervised predictive model will be considered a success by the help of the confusion matrix
+
+### c) Understanding the context
+
+Credit card default happens when a customer  becomes severely delinquent on their credit card payments say if a client misses the minimum payment six months in a row, then the credit card will be in default and the bank will more than likely close the account.
+For lenders, an increase in credit card delinquencies is an expensive proposition, since the more delinquent an account becomes, the smaller the chance it will be repaid at all.
+Therefore predicting delinquencies is an important objective for these lending institutions.
+
+
+### d) Recording the Experimental Design
+
+1. Importing the data set
+
+2. Data Understanding 
+
+3. Performing Data Cleaning
+
+4. Performing EDA
+
+5. Building a Supervised Learning Model : A classification Model.
+
+6. Building an Unsupervised Learning model while applying dimensionality reduction techniques :    Clustering Model with K-Means and DBSCAN Clustering.
+
+7. Providing Recommendations and Insights based on our findings.
+
+
+### e) Data Relevance
+
+The datasets are large enough to be used for Exploratory Data Analysis and for the modeling purposes, thus promising better outcomes.
+
+### f) Reading the Data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(ggplot2)
+library(tidyverse)
+
+```
+
+
+```{r}
+
+library(readxl)
+defaulters <- read_excel("C:/Users/ALLANOOH/Documents/moringa/R/IP's/ABRACA -DATA/default of credit card clients.xls")
+
+```
+
+
+## 2. Data Understanding
+
+```{r}
+str(defaulters)
+```
+
+Our dataset is comprised of numeric variables
+
+
+
+```{r}
+# previewing the dataset
+glimpse(defaulters)
+
+```
+
+
+There are 25 variables:
+
+1.  ID: ID of each client
+2.  LIMIT_BAL: Amount of given credit in NT dollars (includes individual and family/supplementary credit
+3.  SEX: Gender (1=male, 2=female)
+4.  EDUCATION: (1=graduate school, 2=university, 3=high school, 4=others,     5=unknown, 6=unknown)
+5.  MARRIAGE: Marital status (1=married, 2=single, 3=others)
+6.  AGE: Age in years
+7.  PAY_0: Repayment status in September, 2005 (0=pay duly, 1=payment        delay for one month, 2=payment delay for two months, ... 8=payment        delay for eight months, 9=payment delay for nine months and above)
+8.  PAY_2: Repayment status in August, 2005 (scale same as above)
+9.  PAY_3: Repayment status in July, 2005 (scale same as above)
+10.  PAY_4: Repayment status in June, 2005 (scale same as above)
+11. PAY_5: Repayment status in May, 2005 (scale same as above)
+12. PAY_6: Repayment status in April, 2005 (scale same as above)
+13. BILL_AMT1: Amount of bill statement in September, 2005 (NT dollar)
+14. BILL_AMT2: Amount of bill statement in August, 2005 (NT dollar)
+15. BILL_AMT3: Amount of bill statement in July, 2005 (NT dollar)
+16. BILL_AMT4: Amount of bill statement in June, 2005 (NT dollar)
+17. BILL_AMT5: Amount of bill statement in May, 2005 (NT dollar)
+18. BILL_AMT6: Amount of bill statement in April, 2005 (NT dollar)
+19. PAY_AMT1: Amount of previous payment in September, 2005 (NT dollar)
+20. PAY_AMT2: Amount of previous payment in August, 2005 (NT dollar)
+21. PAY_AMT3: Amount of previous payment in July, 2005 (NT dollar)
+22. PAY_AMT4: Amount of previous payment in June, 2005 (NT dollar)
+23. PAY_AMT5: Amount of previous payment in May, 2005 (NT dollar)
+24. PAY_AMT6: Amount of previous payment in April, 2005 (NT dollar)
+25. default.payment.next.month: Default payment (1=yes, 0=no)
+
+
+## 3. Data Cleaning
+
+
+We dropped the ID column from the dataset as it was a redundant column.
+
+```{r}
+# dropping the id 
+defaulters <- subset(defaulters, select = -c(ID))
+dim(defaulters)
+
+head(defaulters)
+```
+
+
+```{r}
+# checking for the null values
+sum(is.na(defaulters))
+
+```
+
+
+There were no null values identified
+
+
+
+```{r}
+# checking for the duplicated values
+
+sum(duplicated(defaulters))
+```
+
+35 duplicated values were observed and dropped
+
+```{r}
+# dropping the duplicated values
+
+def <- distinct(defaulters)
+
+# confirming if the duplicated valued were removed
+
+sum(duplicated(def))
+```
+
+
+```{r}
+# Renaming column default payment next month where they have spaces in between.
+names(def)[names(def) == "default payment next month"] <- "default_payment_next_month"
+
+head(def)
+```
+
+
+```{r, fig.width= 30, fig.height=20}
+# checking for outliers
+#
+# selecting the continous variables
+split_1 <- subset(def, select = c(LIMIT_BAL, AGE, BILL_AMT1, BILL_AMT2, BILL_AMT3, BILL_AMT4,
+                                  BILL_AMT5, BILL_AMT6, PAY_AMT1))
+
+# plotting for the selected variables
+boxplot(split_1,
+  ylab = "Value counts",
+  main = "Boxplot to identify overall outliers"
+)
+mtext(paste("Outliers: "))
+
+```
+
+
+
+From the boxplot we can observe there is the presence of outliers in the dataset. The outliers will not be removed so as to identify if there are patterns in the dataset.
+
+
+
+
+## 4. Exploratory Data Analysis 
+
+### a) Univariate Data Analysis
+
+#### Countplots for the Categorical Variables.
+
+```{r , fig.width=7 , fig.height=7}
+# count plot for the age column
+ggplot(def, aes(as.factor(x=AGE))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Age Variable' , x ='Age' , y = 'Count')+coord_flip()
+
+```
+
+
+Most of the clients who obtain the credit cards are the youths aged between 25 to 40 years
+
+
+ 
+
+```{r , fig.width=10 , fig.height=10}
+# count plot for the limit bal column
+
+ggplot(def, aes(as.factor(x= LIMIT_BAL))) + geom_histogram(fill= "steelblue" , stat="count" , bins = 10)+labs(title='Countplot for the limit bal Variable' , x ='Limit Balance' , y = 'Count')+coord_flip()
+
+```
+
+
+Most of the clients appear in the limit balance between 350,000 to 510,000
+
+
+##### Gender
+
+(1 = male; 2 = female)
+
+
+```{r}
+# plotting for the gender column
+ggplot(def, aes(as.factor(x=SEX))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Gender Variable' , x ='Gender' , y = 'Count')
+
+```
+
+Females happen to be the ones who take most credit cards over the period of time
+
+
+#### The Education Variable
+
+(1 = graduate school; 2 = university; 3 = high school; 4 = others)
+
+```{r}
+
+ggplot(def, aes(as.factor(x=EDUCATION))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Education Variable' , x ='Level of Education' , y = 'Count')
+
+```
+
+
+Most of the clients who take credit cars are those fromwith the education level of university and graduate high school
+
+
+#### Marriage
+
+(1 = married; 2 = single; 3 = others)
+
+```{r}
+
+ggplot(def, aes(as.factor(x=MARRIAGE))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Marital Status' , x ='Marital Status', y = 'Count')
+
+```
+
+
+Most of the clients who happen to take credit cards are the singles followed by the married
+
+
+
+#### History of Past Payments Variables 
+
+Past monthly payment records (from April to September, 2005) as follows: 
+ PAY_0 = the repayment status in September, 2005; 
+ PAY_1 = the repayment status in August, 2005; . . .;
+ PAY_6 = the repayment status in April, 2005. 
+
+
+The measurement scale for the repayment status is: 
+   + 0 = pay duly;
+   + 1 = payment delay for one month; 
+   + 2 = payment delay for two months; . . .; 
+   + 8 = payment delay for eight months; 
+   + 9 = payment delay for nine months and above.
+
+
+
+
+```{r, fig.width=10,fig.height=12}
+library(ggpubr)
+
+# combining -1 and -2 to 0 so as to sum up the amount paid duly 
+def$PAY_0[def$PAY_0 == -2 | def$PAY_0== -1] <- 0
+def$PAY_2[def$PAY_2 == -2 | def$PAY_2== -1] <- 0
+def$PAY_3[def$PAY_3 == -2 | def$PAY_3== -1] <- 0
+def$PAY_4[def$PAY_4 == -2 | def$PAY_4== -1] <- 0
+def$PAY_5[def$PAY_5 == -2 | def$PAY_5== -1] <- 0
+def$PAY_6[def$PAY_6 == -2 | def$PAY_6== -1] <- 0
+
+p1 <- ggplot(def, aes(as.factor(x=PAY_0))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Repayment Status for September' , x ='Repayment Status' , y = 'Count')
+
+
+
+p2 <- ggplot(def, aes(as.factor(x=PAY_2))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Repayment Status for August' , x ='Repayment Status' , y = 'Count')
+
+p3 <- ggplot(def, aes(as.factor(x=PAY_3))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Repayment Status for July' , x ='Repayment Status' , y = 'Count')
+
+p4<- ggplot(def, aes(as.factor(x=PAY_4))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Repayment Status for June' , x ='Repayment Status' , y = 'Count')
+
+
+p5 <- ggplot(def, aes(as.factor(x=PAY_5))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Repayment Status for May' , x ='Repayment Status' , y = 'Count')
+
+p6 <- ggplot(def , aes(as.factor(x=PAY_6))) + geom_bar(fill= "steelblue")+labs(title='Countplot for the Repayment Status for April' , x ='Repayment Status' , y = 'Count')
+
+figure <- ggarrange(p1, p2, p3,p4,p5,p6,
+                  ncol = 2, nrow = 3)
+figure
+```
+
+The pay delay by almost one month is the one outstanding followed by those who pay duly as their credit card as of and when it falls due as exhibited by the various count plots for different months
+
+
+### Continuous Variables
+
+```{r}
+# selecting the continuous variables
+cont <- subset(def, select =c(LIMIT_BAL, AGE, BILL_AMT1, BILL_AMT2, BILL_AMT3, BILL_AMT4, BILL_AMT5, BILL_AMT6, PAY_AMT1, PAY_AMT2, PAY_AMT3, PAY_AMT4, PAY_AMT5, PAY_AMT6))
+
+#Descriptive statistics for the continuous variables
+
+summary(cont)
+```
+
+
+
+We can observe the measures of central tendency for different columns such as mean for each column.
+
+
+
+#### The Bill Amount Variables 
+
+
++ 13.BILL_AMT1: Amount of bill statement in September, 2005 (NT dollar)    + 14. BILL_AMT2: Amount of bill statement in August, 2005 (NT dollar) 
++  15. BILL_AMT3: Amount of bill statement in July, 2005 (NT dollar)
++  16. BILL_AMT4: Amount of bill statement in June, 2005 (NT dollar)
++  17. BILL_AMT5: Amount of bill statement in May, 2005 (NT dollar)
++  18. BILL_AMT6: Amount of bill statement in April, 2005 (NT dollar)
+
+
+```{r , fig.width=10,fig.height=12}
+
+p1 <- ggplot(def,aes(x=BILL_AMT1)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Bill Amount for April' , x ='Bill Amount' , y = 'Count')
+
+
+
+p2 <- ggplot(def,aes(x=BILL_AMT2)) + geom_histogram(fill= "steelblue" , bins=20)+labs(title='Histogram showing the Bill Amount for May' , x ='Bill Amount' , y = 'Count')
+
+
+p3 <- ggplot(def,aes(x=BILL_AMT3)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Bill Amount for June' , x ='Bill Amount' , y = 'Count')
+
+
+p4 <- ggplot(def,aes(x=BILL_AMT4)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Bill Amount for July' , x ='Bill Amount' , y = 'Count')
+
+
+p5 <- ggplot(def,aes(x=BILL_AMT5)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Bill Amount for August' , x ='Bill Amount' , y = 'Count')
+
+
+p6 <- ggplot(def,aes(x=BILL_AMT6)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Bill Amount for September' , x ='Bill Amount' , y = 'Count')
+
+
+
+figure <- ggarrange(p1, p2, p3,p4,p5,p6,
+                  ncol = 2, nrow = 3)
+figure
+
+```
+
+
+#### Paid Amount Variables
+
+
++PAY_AMT1: Amount of previous payment in September, 2005 (NT dollar)
++20. PAY_AMT2: Amount of previous payment in August, 2005 (NT dollar)
++21. PAY_AMT3: Amount of previous payment in July, 2005 (NT dollar)
++22. PAY_AMT4: Amount of previous payment in June, 2005 (NT dollar)
++23. PAY_AMT5: Amount of previous payment in May, 2005 (NT dollar)
++24. PAY_AMT6: Amount of previous payment in April, 2005 (NT dollar)
+
+
+
+```{r , fig.width=10,fig.height=12}
+
+p1 <- ggplot(def,aes(x=PAY_AMT1)) + geom_histogram(fill= "steelblue" , bins=30 )+labs(title='Histogram showing the Paid Amount for April' , x ='Paid Amount' , y = 'Count')
+
+
+
+p2 <- ggplot(def,aes(x=PAY_AMT2)) + geom_histogram(fill= "steelblue" , bins=20)+labs(title='Histogram showing the Paid Amount for May' , x ='Paid Amount' , y = 'Count')
+
+
+p3 <- ggplot(def,aes(x=PAY_AMT3)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Paid Amount for June' , x ='Paid Amount' , y = 'Count')
+
+
+p4 <- ggplot(def,aes(x=PAY_AMT4)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Paid Amount for July' , x ='Paid Amount' , y = 'Count')
+
+
+p5 <- ggplot(def,aes(x=PAY_AMT5)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Paid Amount for August' , x ='Paid Amount' , y = 'Count')
+
+
+p6 <- ggplot(def,aes(x=PAY_AMT6)) + geom_histogram(fill= "steelblue" , bins=20 )+labs(title='Histogram showing the Paid Amount for September' , x ='Paid Amount' , y = 'Count')
+
+
+
+figure <- ggarrange(p1, p2, p3,p4,p5,p6,
+                  ncol = 2, nrow = 3)
+figure
+
+
+```
+
+We can observe the absence of normality since they lack bell shaped like figures and the most of the variables are positively skewed.
+
+
+
+Summary
+
+From the univariate analysis we noted that :
+There were more single people than married people within the population.
+Majority of the people in the dataset had a tertiary education , either at a university level or a graduate level.
+There were more female customers than male customers and the majority of the population was made up of people aged between 20-40 years.
+
+
+### b) Bivariate Data Analysis
+
+```{r , fig.width=7 , fig.height=9}
+# identifying the age group which has the highest rate of credit card default
+
+ggplot(def, aes(as.factor(x=AGE))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Frequency Distribution Plot for the Age Variable' , x ='Age' , y = 'Count')+coord_flip()+ guides(fill =guide_legend(title = "Defaulters"))
+```
+
+
+
+
+The number of people defaulting on their payments is spread out throughout all the age groups , however those aged between 25 - 40 can be seen to have higher defaulting rates.
+
+
+```{r , fig.width=7 , fig.height=9}
+
+ggplot(def, aes(as.factor(x=LIMIT_BAL))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Frequency Distribution Plot for the Limit Balance Variable' , x ='Limit Balance' , y = 'Count')+coord_flip()+ guides(fill =guide_legend(title = "Defaulters"))
+```
+
+Majority of the customers defaulting on their payments have low limit balances of between 10,000-50,000 NT Dollars.
+
+
+```{r}
+
+ggplot(def, aes(as.factor(x=MARRIAGE))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Count Plot for the Marriage Variable' , x ='Marital Status' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+```
+
+
+The number of defaulters , is almost equal between those that are married and the single population.
+
+
+```{r}
+
+ggplot(def, aes(as.factor(x=SEX))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Count Plot for the Sex Variable' , x ='Sex' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+```
+
+
+Despite the number of female customers being significantly larger than that of their male counterparts , the deliquecy rates can be seen to be almost equal among both genders.
+
+
+
+```{r}
+
+# identifying the age group and gender which has the highest rate of credit card default
+ggplot(def, aes(as.factor(x=MARRIAGE))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+
+   facet_grid(.~SEX)+
+   labs(title='Count Plot for the Marriage Variable' , x ='Marital Status' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+```
+
+
+
+
+
+
+```{r}
+# Identifying which level of education and gender has the highest rate of default
+ggplot(def, aes(as.factor(x=EDUCATION))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Count Plot for the Education Variable' , x ='Education' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+
+```
+
+
+The university educated customers have higher defaulting rates compared to the graduate and high school educated customers.
+However the rates are proportional to the number of customers with university education.
+
+
+```{r,fig.width=10,fig.height=12}
+library(ggpubr)
+
+p1 <- ggplot(def, aes(as.factor(x=PAY_0))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Countplot for the Repayment Status for April' , x ='Repayment Status' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+
+
+p2 <- ggplot(def, aes(as.factor(x=PAY_2))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Countplot for the Repayment Status for May' , x ='Repayment Status' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+
+p3 <- ggplot(def, aes(as.factor(x=PAY_3))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Countplot for the Repayment Status for June' , x ='Repayment Status' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+
+p4<- ggplot(def, aes(as.factor(x=PAY_4))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Countplot for the Repayment Status for July' , x ='Repayment Status' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+
+
+p5 <- ggplot(def, aes(as.factor(x=PAY_5))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Countplot for the Repayment Status for August' , x ='Repayment Status' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+
+p6 <- ggplot(def , aes(as.factor(x=PAY_6))) + geom_bar(aes(fill=as.factor(default_payment_next_month)))+labs(title='Countplot for the Repayment Status for September' , x ='Repayment Status' , y = 'Count')+ guides(fill =guide_legend(title = "Defaulters"))
+
+
+figure <- ggarrange(p1, p2, p3,p4,p5,p6,
+                  ncol = 2, nrow = 3)
+figure
+
+
+
+```
+
+
+
+```{r}
+# Marriage status agaist the limit balance
+credit <- def
+credit$MARRIAGE <- as.factor(credit$MARRIAGE)
+levels(credit$MARRIAGE) <- c("Unknown" , "Married" , "Single" ,"Others")
+ggplot(data =credit, mapping = aes(group=as.factor(x=MARRIAGE),x=MARRIAGE, y=LIMIT_BAL))+
+  geom_boxplot(aes(fill = as.factor(default_payment_next_month)))+
+  facet_wrap(~default_payment_next_month)+ guides(fill =guide_legend(title = "Defaulters"))+labs(title='Marriage Status against Limit Balance')
+```
+
+
+We plotted  the outliers between the marital status and the limit_balance between those who defaulted and those who did not. We can see that the limit balances for those who did not default is higher .
+The highest limit balance among the people who defaulted on their payments was 750,000 while that for those who did not was 1,000,000 NT.
+Married people also seem to have higher limit balances than their single counterparts.
+The people who defaulted on their payments , regardless of their marital 
+
+
+```{r}
+# limit balance against education
+credit$EDUCATION <- as.factor(credit$EDUCATION)
+levels(credit$EDUCATION) <- c("Unknown", "Grad", "Uni", "High_Sch", "Other", "Unknown", "Unknown")
+ggplot(data =credit, mapping = aes(group=as.factor(x=EDUCATION),x=EDUCATION, y=LIMIT_BAL))+
+  geom_boxplot(aes(fill = as.factor(default_payment_next_month)))+
+  facet_wrap(~default_payment_next_month)+ guides(fill =guide_legend(title = "Defaulters"))+labs(title='LIMIT_BALANCE AGAINST EDUCATION')
+```
+
+
+
+We can see from these boxplots that the clients with the higher limit balance are those with a graduate degree.
+There were very few people with a limit balance of over 500,000 and with graduate degrees that defaulted from paying their credit card fees.
+People with university degrees that defaulted had lower limit balances than those that did not , this can also be said for those with a High school education.
+Those with a high school education have  a significantly lower limit compared to all the education levels
+
+#### Summary
+
+From our univariate and bivariate analysis , we made many notable observations.
+Irregardless of factors such as marital status and education , the clients who defaulted on their payments had lower limit balances than the clients who paid their credit card bill.
+Despite there being more single clients , the number of married people who defaulted was almost equal to that of single people.
+More women defaulted from their payments than men however women made up more than half the entire population.
+
+Those with a highschool education regardless of whether or not they paid their credit card fees had lower limit balances than any other demographic.
+Those aged between 20-40 made up the largest demographic of both the defaulters and the dataset in general.
+
+
+### c) Multivariate Data Analysis
+
+#### Principal Component Analysis
+
+```{r}
+# Loading the required libraries
+library("FactoMineR")
+library("factoextra")
+```
+
+```{r}
+# Subselectting the class column()
+def_pca <- subset(def, select = -c(default_payment_next_month))
+```
+
+```{r}
+# Data standardization
+
+library(FactoMineR)
+
+PCA(def_pca, scale.unit = TRUE, ncp = 5, graph = TRUE)
+```
+
+
+```{r}
+# computing principal component analysis on the active individuals/variables
+
+library("FactoMineR")
+
+res.pca <- PCA(def_pca, graph = FALSE)
+
+print(res.pca)
+```
+
+
+
+```{r}
+#We examine the eigenvalues to determine the number of principal components to be considered. 
+library("factoextra")
+eig.val <- get_eigenvalue(res.pca)
+eig.val
+```
+
+The sum of all the eigenvalues give a total variance of 23.
+
+```{r}
+# plotting a scree plot to identify the optimum number of dimensions to use
+fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 50))
+```
+
+
+From the plot above, we might want to stop at the fifth principal component. 63.8% of the information (variances) contained in the data are retained by the first five principal components.
+
+
+
+```{r}
+# extracting the results for the PCA
+var <- get_pca_var(res.pca)
+var
+```
+
+
+```{r}
+# extracting contribution of different variables
+head(var$contrib, 5)
+```
+
+
+The larger the value of the contribution, the more the variable contributes to the component.
+
+
+
+```{r,fig.width=10,fig.height=12}
+# highlighting the most contributing variables for each dimension:
+
+library("corrplot")
+corrplot(var$contrib, is.corr=FALSE)
+
+```
+
+
+
+```{r}
+# Contributions of variables to PC1
+fviz_contrib(res.pca, choice = "var", axes = 1, top = 10)
+
+# Contributions of variables to PC2
+fviz_contrib(res.pca, choice = "var", axes = 2, top = 10)
+
+# Contributions of variables to PC3
+fviz_contrib(res.pca, choice = "var", axes = 3, top = 10)
+
+# Contributions of variables to PC4
+fviz_contrib(res.pca, choice = "var", axes = 4, top = 10)
+
+# Contributions of variables to PC5
+fviz_contrib(res.pca, choice = "var", axes = 5, top = 10)
+```
+
+```{r}
+# The most important or contributing variables are highlighted on the correlation plot bellow
+fviz_pca_var(res.pca, col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07")
+             )
+```
+
+
+```{r}
+# most contributing variables in bar graph form
+fviz_contrib(res.pca, choice = "var", axes = 1:5, top = 10)
+```
+
+
+We can observe that the most contributing variable are:
+
+a) BIL_AMT4
+
+b) BIL_AMT2
+
+c) BIL_AMT3
+
+d) BIL_AMT5
+
+e) BIL_AMT1
+
+f) BIL_AMT6
+
+g) SEX
+
+h) PAY_4
+
+i) PAY_5
+
+j) PAY_3
+
+
+
+### d) Feature Selection
+
+```{r}
+# load the library
+library(caret)
+library(corrplot)
+```
+
+```{r}
+# subsetting the class column
+features <- subset(def, select = -c(default_payment_next_month)) 
+
+# Calculating the correlation matrix
+# ---
+#
+correlationMatrix <- cor(features)
+
+# Find attributes that are highly correlated
+# ---
+#
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
+
+# Highly correlated attributes
+# ---
+# 
+highlyCorrelated
+
+names(features[,highlyCorrelated])
+```
+
+The features selected from the PCA are affirmed through feature selection
+
+
+```{r,fig.width=10,fig.height=12}
+# We can remove the variables with a higher correlation 
+# ---
+# 
+# Removing Redundant Features 
+# ---
+# 
+def_1<-def[-highlyCorrelated]
+
+# Performing our graphical comparison
+# ---
+# 
+par(mfrow = c(1, 2))
+corrplot(correlationMatrix, order = "hclust")
+corrplot(cor(def_1), order = "hclust")
+```
+
+
+
+After dropping the highly correlated variables, we repeated the PCA process again to identify the most contributing variables amongst the remaining variables.
+
+
+```{r}
+# dropping the class column
+def_2 <- subset(def_1, select = -c(default_payment_next_month))
+PCA(def_2, scale.unit = TRUE, ncp = 5, graph = TRUE)
+```
+
+
+The selected variables are:
+1. Sex
+
+2. Age
+
+3. Marriage
+
+4. Education
+
+5. Limit_Bal
+
+6. Pay_0
+
+7. Pay_2
+
+8. Pay_6
+
+9. Bill_AMT1
+
+
+
+## 4. Modelling
+
+### a) Logistic regression
+
+```{r}
+# selecting the variables selected during feature selection and the class column
+
+selected <- subset(def, select = c(SEX, MARRIAGE, EDUCATION, LIMIT_BAL, PAY_0, PAY_2, PAY_6, BILL_AMT1, default_payment_next_month))
+
+```
+
+```{r}
+# checking for the distribution of the target variable
+table(selected$default_payment_next_month)
+```
+
+```{r}
+# Loading caret library
+require(caret)
+# Splitting the data into train and test
+index <- createDataPartition(selected$default_payment_next_month, p = .70, list = FALSE)
+
+train <- selected[index, ]
+test <- selected[-index, ]
+```
+
+
+
+```{r}
+ # Training the model
+logistic_model <- glm(default_payment_next_month ~ ., family = binomial(), train)
+
+# Checking the model
+summary(logistic_model)
+```
+
+
+```{r}
+# Predicting in the test dataset
+pred_prob <- predict(logistic_model, test, type = "response")
+
+```
+
+
+```{r}
+# Converting from probability to actual output
+train$pred_class <- ifelse(logistic_model$fitted.values >= 0.5, ">0", "<=0")
+
+# Generating the classification table
+ctab_train <- table(train$default_payment_next_month, train$pred_class)
+ctab_train
+#
+#
+# Converting from probability to actual output
+test$pred_class <- ifelse(pred_prob >= 0.5, ">0", "<=0")
+
+# Generating the classification table
+ctab_test <- table(test$default_payment_next_month, test$pred_class)
+ctab_test
+```
+
+
+
+```{r}
+# Accuracy in Training dataset
+accuracy_train <- sum(diag(ctab_train))/sum(ctab_train)*100
+accuracy_train
+```
+
+
+Our logistics model is able to classify 81.18326% of all the observations correctly in the training dataset
+
+
+True Positive Rate – Recall or Sensitivity
+
+"Recall or TPR indicates how often does our model predicts actual TRUE from the overall TRUE events."
+
+```{r}
+# Recall in Train dataset
+Recall <- (ctab_train[2, 2]/sum(ctab_train[2, ]))*100
+Recall
+```
+
+
+True Negative Rate
+
+TNR indicates how often does our model predicts actual non-events from the overall nonevents.
+
+
+```{r}
+# TNR in Train dataset
+TNR <- (ctab_train[1, 1]/sum(ctab_train[1, ]))*100
+TNR
+```
+
+
+
+Precision
+
+"Precision indicates how often does your predicted TRUE values are actually TRUE"
+
+```{r}
+# Precision in Train dataset
+Precision <- (ctab_train[2, 2]/sum(ctab_train[, 2]))*100
+Precision
+```
+
+
+
+
+### b) Decision Tree Classifier
+
+```{r}
+dtc <- selected
+
+dim(dtc)
+```
+
+
+Splitting the Data
+
+We split my dataset into a training and testing set and then built my model. Given that the Target variable was binary therefore we built a classification model.
+
+Splitting the Dataset into a Train and Test set with an 80:20 split
+
+
+
+```{r}
+sample_train<- sample(seq_len(nrow(dtc)), size = floor(0.80*nrow(dtc)))
+sample_test <- sample(seq_len(nrow(dtc)), size = floor(0.20*nrow(dtc)))
+
+training     <- dtc[sample_train, ]
+test      <- dtc[sample_test, ]
+
+dim(training)
+
+dim(test)
+```
+
+
+
+
+Training the Model we used the as.factor function for my target as the model was a Classification model
+
+Finally we built our decision tree using cross validation to find the optimal model.
+```{r}
+library(caret)
+```
+
+```{r}
+training$default_payment_next_month <- as.factor(training$default_payment_next_month)
+test$default_payment_next_month <- as.factor(test$default_payment_next_month)
+
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+set.seed(123)
+dtree_fit <- train(default_payment_next_month ~., data = training, method = "rpart",
+                   parms = list(split = "information"),
+                   trControl=trctrl,
+                   tuneLength = 10)
+```
+
+
+```{r}
+dtree_fit
+```
+
+
+
+```{r}
+library(rpart)
+library(rpart.plot)
+prp(dtree_fit$finalModel, box.palette = "Reds")
+```
+
+
+
+```{r}
+#Model Evaluation We evaluated the model using the confusion matrix.
+
+test_pred <- predict(dtree_fit, newdata = test)
+confusionMatrix(test_pred, test$default_payment_next_month )
+```
+
+
+From the evaluation of the model , although the accuracy stands at 82% , the confusion matrix shows that many of the samples in the minority class are misclassified. This is due to the class imbalance in the dataset itself . Therefore we applied an oversampling technique to compensate for this.
+
+
+Oversampling the imbalanced dataset
+
+
+
+```{r}
+library(ROSE)
+```
+
+```{r}
+# upsampling the dataset
+
+data_balanced_over <- ovun.sample(default_payment_next_month ~ ., data = training, method = "over")$data
+table(data_balanced_over$default_payment_next_month)
+```
+
+```{r}
+#  fitting the upsampled dataset
+
+data_balanced_over$default_payment_next_month <- as.factor(data_balanced_over$default_payment_next_month)
+test$default_payment_next_month <- as.factor(test$default_payment_next_month)
+
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+set.seed(123)
+dtree_fit <- train(default_payment_next_month ~., data = data_balanced_over, method = "rpart",
+                   parms = list(split = "information"),
+                   trControl=trctrl,
+                   tuneLength = 10)
+
+
+dtree_fit
+```
+
+
+
+
+
+```{r}
+prp(dtree_fit$finalModel, box.palette = "Reds")
+```
+
+
+
+```{r}
+test_pred <- predict(dtree_fit, newdata = test)
+confusionMatrix(test_pred, test$default_payment_next_month )
+```
+
+
+After oversampling we a model with a predictability power of 71.14%.
+
+
+
+
+
+
+
+### c) K-Means
+
+```{r}
+library(tidyverse)  
+library(cluster)    
+library(factoextra) 
+```
+
+```{r}
+# scaling the dataset
+df <- scale(subset(selected, select = -c(default_payment_next_month)))
+```
+
+```{r}
+# Trying with normalization technique 
+k_mean <- select(def, c(SEX,AGE,MARRIAGE,LIMIT_BAL,PAY_0,PAY_2,PAY_6,BILL_AMT1))
+dim(k_mean)
+normalize <- function(x){
+  return ((x-min(x)) / (max(x)-min(x)))
+}
+# Applying the Normalization function to the data
+k_mean <- normalize(k_mean)
+head(k_mean)
+```
+
+
+```{r}
+#Elbow Method for finding the optimal number of clusters
+set.seed(1123)
+# Compute and plot wss for k = 2 to k = 15.
+k.max <- 15
+data <- k_mean
+wss <- sapply(1:k.max, 
+              function(k){kmeans(data, k, nstart=50,iter.max = 1000 , algorithm="Lloyd" )$tot.withinss})
+wss
+plot(1:k.max, wss,
+     type="b", pch = 19, frame = FALSE, 
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares")
+```
+
+
+Using the standadised dataset we got the optimal K=2
+
+
+
+K-Means with the scaled dataset below: 
+
+```{r}
+# computing k- means clustering
+k2 <- kmeans(df, centers = 2, nstart = 25)
+str(k2)
+```
+
+```{r}
+#We can also view our results by using fviz_cluster. This provides a nice illustration of the clusters. If there are more than two dimensions (variables) fviz_cluster will perform principal component analysis (PCA) and plot the data points according to the first two principal components that explain the majority of the variance.
+
+fviz_cluster(k2, data = df)
+```
+
+
+```{r}
+#Verify results of clustering
+table(k2$cluster,selected$default_payment_next_month)
+```
+
+## Conclusions
+
+From our analysis, we concluded the following two major factors
+
+ be observed keenly of whether someone is a defaulter or not are:
+
+Limit Balance - From our analysis demonstrates that the clients who defaulted on their payments had lower limit balances than the clients who paid their credit card bill. 
+
+Repayment Status  - which means that just by looking at how late someone is on their payments in 1 month, we can tell if they will default or not. The pay delay by almost one month is the one outstanding followed by those who pay duly as their credit card as of and when it falls due as exhibited by the various count plots for different months.
+
+
+
+## RECOMMENDATIONS
+
+In general , in order to mitigate losses and prevent people from defaulting or falling behind on their credit card payments the bank should put measures that incentivise timely payment. For instance the bank should charge late fees for any payment made later than the day it was due.
+
+Given that those aged between 20-40 made up the largest demographic of both the defaulters and the dataset in general the bank could put up measures that would help them prevent losses. For instance they could ask for proof of employment before issuing credit cards.
+
+We recommend the Decision Trees model which performed better than the Logistic Regression Model. 
+
+If considering clustering, we recommend KMeans clustering model as it was able to correctly identify 2 clusters.
+ 
+ 
+
+
+
+
+
+
+
+Limit Balance - From our analysis demonstrates that the clients who defaulted on their payments had lower limit balances than the clients who paid their credit card bill. 
+
+Age - Those aged between 20-40 made up the largest demographic of both the defaulters and the dataset in general.
+
+Repayment Status  - which means that just by looking at how late someone is on their payments in 1 month, we can tell if they will default or not. The pay delay by almost one month is the one outstanding followed by those who pay duly as their credit card as of and when it falls due as exhibited by the various count plots for different months
+
+ 
+More women defaulted from their payments than men however women made up more than half the entire population.
+
+
+From the modeling bit, we recommend the decision tree which has a better performance.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
